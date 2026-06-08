@@ -17,6 +17,11 @@ const wss = new WebSocket.Server({ noServer: true });
 // Serve client directory statically
 app.use(express.static(path.join(__dirname, '../client')));
 
+// Redirect root to terminal.html for Phase 1
+app.get('/', (req, res) => {
+  res.redirect('/terminal.html');
+});
+
 // Handle connection upgrade to /terminal WebSocket
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
