@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>PhoneTerm</title>
+  <!-- xterm.css CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.3.0/css/xterm.min.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="terminal-container"></div>
+  
+  <!-- Mobile Toolbar for Special Keys -->
+  <div id="toolbar">
+    <button class="key-btn" data-seq="esc">ESC</button>
+    <button class="key-btn" data-seq="tab">TAB</button>
+    <button id="ctrl-btn" class="key-btn">CTRL</button>
+    <button class="key-btn" data-seq="up">↑</button>
+    <button class="key-btn" data-seq="down">↓</button>
+    <button class="key-btn" data-seq="left">←</button>
+    <button class="key-btn" data-seq="right">→</button>
+    <button class="key-btn" data-seq="ctrl-c">^C</button>
+    <button class="key-btn" data-seq="ctrl-d">^D</button>
+  </div>
+
+  <!-- xterm.js CDN files -->
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.8.0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.9.0/lib/addon-web-links.min.js"></script>
+  <script src="/terminal.js"></script>
+</body>
+</html>

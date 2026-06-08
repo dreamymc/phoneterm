@@ -1,0 +1,58 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0d0d0d;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  position: fixed; /* Prevents iOS rubber-banding */
+  width: 100%;
+  height: 100%;
+}
+
+#terminal-container {
+  width: 100vw;
+  height: calc(100vh - 52px); /* Accounts for bottom toolbar height */
+  padding: 8px;
+}
+
+#toolbar {
+  height: 52px;
+  background-color: #1a1a1a;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid #333;
+  padding: 4px;
+}
+
+.key-btn {
+  background-color: #2b2b2b;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 4px;
+  flex: 1;
+  margin: 0 2px;
+  height: 100%;
+  font-family: monospace;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.key-btn:active {
+  background-color: #444;
+}
+
+#ctrl-btn.active {
+  background-color: #ff9900;
+  color: #000;
+  border-color: #ffb366;
+}
