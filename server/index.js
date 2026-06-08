@@ -3,7 +3,8 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const ip = require('ip');
-const chalk = require('chalk');
+const chalkModule = require('chalk');
+const chalk = chalkModule.default || chalkModule;
 const config = require('./config');
 const { spawnTerminal } = require('./terminal');
 
