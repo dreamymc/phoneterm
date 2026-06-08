@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhoneTerm - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-page">
+  <div class="login-wrapper">
+    <div class="login-card" id="login-card">
+      <div class="logo-area">
+        <span class="terminal-prompt">$</span>
+        <span class="logo-text">PhoneTerm</span>
+      </div>
+      <p class="subtitle">Secure WSL Remote Terminal Access</p>
+      
+      <form id="login-form">
+        <div class="input-group">
+          <input type="password" id="token-input" placeholder="Enter Access Token" autocomplete="current-password" aria-label="Access Token" required>
+        </div>
+        <button type="submit" id="submit-btn">
+          <span>Connect</span>
+          <svg class="arrow-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42 5.43 5.43H5v2z"/></svg>
+        </button>
+        <p id="error-message" class="error-msg"></p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Auto-redirect if already logged in
+    const existingToken = localStorage.getItem('phoneterm_token');
+    if (existingToken) {
+      window.location.href = '/term';
+    }
+
+    const form = document.getElementById('login-form');
+    const input = document.getElementById('token-input');
+    const card = document.getElementById('login-card');
+    const errorMsg = document.getElementById('error-message');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.textContent = '';
+      card.classList.remove('shake');
+      
+      const token = input.value.trim();
+      if (!token) return;
+
+      try {
+        const response = await fetch('/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ token })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.token) {
+          localStorage.setItem('phoneterm_token', data.token);
+          window.location.href = '/term';
+        } else {
+          showError(data.error || 'Access denied');
+        }
+      } catch (err) {
+        showError('Network error. Failed to reach server.');
+      }
+    });
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      // Trigger reflow to restart CSS animation
+      void card.offsetWidth;
+      card.classList.add('shake');
+      input.value = '';
+      input.focus();
+    }
+  </script>
+</body>
+</html>

@@ -1,6 +1,11 @@
 const http = require('http');
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
+const path = require('path');
+const jwt = require('jsonwebtoken');
+
+// Load environment variables from .env
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 let serverProcess;
 
@@ -56,7 +61,10 @@ function verifyHttp() {
 function verifyWebSocket() {
   return new Promise((resolve, reject) => {
     console.log("Verifying WebSocket upgrade and PTY relay...");
-    const ws = new WebSocket('ws://localhost:3500/terminal');
+    
+    // Sign a temporary JWT token
+    const token = jwt.sign({ authenticated: true }, process.env.JWT_SECRET);
+    const ws = new WebSocket(`ws://localhost:3500/terminal?token=${token}`);
     
     let receivedBuffer = '';
     let hasSentEcho = false;

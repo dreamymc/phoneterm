@@ -8,17 +8,31 @@ const chalk = chalkModule.default || chalkModule;
 const config = require('./config');
 const { spawnTerminal } = require('./terminal');
 
+const jwt = require('jsonwebtoken');
+const { authRouter } = require('./auth');
+
 const app = express();
 const server = http.createServer(app);
 
 // Create WebSocket server attached to the same HTTP server
 const wss = new WebSocket.Server({ noServer: true });
 
+// Parse JSON request bodies
+app.use(express.json());
+
 // Serve client directory statically
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Redirect root to terminal.html for Phase 1
+// Mount auth router
+app.use('/auth', authRouter);
+
+// Redirect root to index.html (login screen)
 app.get('/', (req, res) => {
+  res.redirect('/index.html');
+});
+
+// Redirect /term to terminal.html
+app.get('/term', (req, res) => {
   res.redirect('/terminal.html');
 });
 
@@ -35,10 +49,40 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-wss.on('connection', (ws) => {
-  console.log("New WebSocket client connected.");
-  // Default to bash for Phase 1 (no auth yet)
-  spawnTerminal(ws, 'bash');
+wss.on('connection', (ws, req) => {
+  console.log("New WebSocket client connecting...");
+  
+  // Extract and verify JWT token from query parameters
+  try {
+    const { searchParams } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const token = searchParams.get('token');
+    
+    if (!token) {
+      console.log("WebSocket connection rejected: Missing token");
+      ws.close(4001, 'Unauthorized: Missing token');
+      return;
+    }
+    
+    jwt.verify(token, config.JWT_SECRET, (err, decoded) => {
+      if (err) {
+        console.log(`WebSocket connection rejected: ${err.message}`);
+        ws.close(4001, 'Unauthorized: Invalid token');
+        return;
+      }
+      
+      if (ws.readyState !== WebSocket.OPEN) {
+        console.log("WebSocket closed before PTY could be spawned.");
+        return;
+      }
+      
+      console.log("WebSocket client successfully authenticated.");
+      // Spawn terminal process
+      spawnTerminal(ws, 'bash');
+    });
+  } catch (err) {
+    console.error("Error during WebSocket verification:", err);
+    ws.close(4001, 'Internal authentication error');
+  }
 });
 
 // Start listening on 0.0.0.0:PORT
@@ -47,6 +91,7 @@ server.listen(config.PORT, '0.0.0.0', () => {
   console.log(chalk.green('╔═══════════════════════════════════════╗'));
   console.log(chalk.green('║         PhoneTerm is running          ║'));
   console.log(chalk.green('╠═══════════════════════════════════════╣'));
-  console.log(chalk.green(`║  Local:    http://${localIp}:${config.PORT}    ║`));
+  console.log(chalk.green(`║  Local:       http://${localIp}:${config.PORT} ║`));
+  console.log(chalk.green(`║  Auth Token:  ${config.AUTH_SECRET}  ║`));
   console.log(chalk.green('╚═══════════════════════════════════════╝'));
 });
