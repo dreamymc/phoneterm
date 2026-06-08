@@ -1,11 +1,11 @@
 let ctrlActive = false;
 
-// WebSocket setup
+// Setup WebSocket connection
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = `${wsProtocol}//${window.location.host}/terminal`;
 const ws = new WebSocket(wsUrl);
 
-// xterm.js setup
+// Initialize xterm.js terminal
 const term = new Terminal({
   cursorBlink: true,
   theme: {
@@ -16,7 +16,6 @@ const term = new Terminal({
   fontSize: 14,
   fontFamily: 'Consolas, "Liberation Mono", Menlo, Courier, monospace'
 });
-window.term = term;
 
 const fitAddon = new FitAddon.FitAddon();
 const webLinksAddon = new WebLinksAddon.WebLinksAddon();
@@ -25,7 +24,7 @@ term.loadAddon(fitAddon);
 term.loadAddon(webLinksAddon);
 term.open(document.getElementById('terminal-container'));
 
-// Function to fit terminal and notify server
+// Resize terminal and send to server
 function resizeTerminal() {
   try {
     fitAddon.fit();
@@ -37,7 +36,7 @@ function resizeTerminal() {
       }));
     }
   } catch (err) {
-    console.error("Error fitting terminal:", err);
+    console.error("Error running resizeTerminal:", err);
   }
 }
 
@@ -55,7 +54,7 @@ ws.onmessage = (event) => {
       term.write(`\r\n[Shell exited with code ${msg.code}]\r\n`);
     }
   } catch (err) {
-    console.error("Error parsing message from server:", err);
+    console.error("Error parsing WebSocket message:", err);
   }
 };
 
@@ -63,24 +62,31 @@ ws.onclose = () => {
   term.write('\r\n[Connection closed]\r\n');
 };
 
+ws.onerror = (err) => {
+  term.write(`\r\n[WebSocket error: ${err.message || 'unknown'}]\r\n`);
+};
+
+// Handle user typing
 term.onData((data) => {
-  if (ws.readyState === WebSocket.OPEN) {
-    if (ctrlActive && data.length === 1) {
-      const char = data.toUpperCase();
-      if (char.charCodeAt(0) >= 65 && char.charCodeAt(0) <= 90) {
-        const ctrlCode = String.fromCharCode(char.charCodeAt(0) - 64);
-        ws.send(JSON.stringify({ type: 'input', data: ctrlCode }));
-      } else {
-        ws.send(JSON.stringify({ type: 'input', data }));
-      }
-      toggleCtrl(false);
+  if (ws.readyState !== WebSocket.OPEN) return;
+
+  if (ctrlActive) {
+    // Check if the input is a single alphabetical character
+    const char = data.toUpperCase();
+    if (char.length === 1 && char.charCodeAt(0) >= 65 && char.charCodeAt(0) <= 90) {
+      const ctrlCode = String.fromCharCode(char.charCodeAt(0) - 64);
+      ws.send(JSON.stringify({ type: 'input', data: ctrlCode }));
     } else {
+      // Send unmodified sequence
       ws.send(JSON.stringify({ type: 'input', data }));
     }
+    toggleCtrl(false);
+  } else {
+    ws.send(JSON.stringify({ type: 'input', data }));
   }
 });
 
-// Setup Mobile Toolbar CTRL Button
+// Setup Mobile Toolbar CTRL Toggle
 const ctrlBtn = document.getElementById('ctrl-btn');
 function toggleCtrl(state) {
   ctrlActive = state !== undefined ? state : !ctrlActive;
@@ -96,7 +102,7 @@ ctrlBtn.addEventListener('click', (e) => {
   toggleCtrl();
 });
 
-// Setup toolbar button escape sequences
+// Special sequences mapping for touch buttons
 const seqMap = {
   'esc': '\x1b',
   'tab': '\t',
@@ -116,7 +122,6 @@ document.querySelectorAll('.key-btn[data-seq]').forEach(btn => {
     if (seq && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'input', data: seq }));
     }
-    term.focus(); // Keep terminal focused
   });
 });
 
@@ -126,6 +131,5 @@ if (window.visualViewport) {
 } else {
   window.addEventListener('resize', resizeTerminal);
 }
-
-// Initial fit after a tiny delay to allow container dimensions to settle
+// Initial fit
 setTimeout(resizeTerminal, 100);
