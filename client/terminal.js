@@ -1,8 +1,14 @@
 let ctrlActive = false;
 
+// Retrieve token from local storage
+const token = localStorage.getItem('phoneterm_token');
+if (!token) {
+  window.location.href = '/';
+}
+
 // Setup WebSocket connection
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsUrl = `${wsProtocol}//${window.location.host}/terminal`;
+const wsUrl = `${wsProtocol}//${window.location.host}/terminal?token=${encodeURIComponent(token)}`;
 const ws = new WebSocket(wsUrl);
 
 // Initialize xterm.js terminal
@@ -58,8 +64,16 @@ ws.onmessage = (event) => {
   }
 };
 
-ws.onclose = () => {
-  term.write('\r\n[Connection closed]\r\n');
+ws.onclose = (event) => {
+  if (event.code === 4001) {
+    term.write('\r\n[Authentication failed or expired. Redirecting to login...]\r\n');
+    localStorage.removeItem('phoneterm_token');
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 2000);
+  } else {
+    term.write('\r\n[Connection closed]\r\n');
+  }
 };
 
 ws.onerror = (err) => {
@@ -133,3 +147,16 @@ if (window.visualViewport) {
 }
 // Initial fit
 setTimeout(resizeTerminal, 100);
+
+// Handle Logout Action
+const logoutBtn = document.getElementById('logout-btn');
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (confirm("Disconnect and log out of PhoneTerm?")) {
+      localStorage.removeItem('phoneterm_token');
+      ws.close();
+      window.location.href = '/';
+    }
+  });
+}
