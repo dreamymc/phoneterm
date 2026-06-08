@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PhoneTerm - Login</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body class="login-page">
   <div class="login-wrapper">
     <div class="login-card" id="login-card">
       <div class="logo-area">
@@ -20,7 +20,7 @@
       
       <form id="login-form">
         <div class="input-group">
-          <input type="password" id="token-input" placeholder="Enter Access Token" autocomplete="current-password" required>
+          <input type="password" id="token-input" placeholder="Enter Access Token" autocomplete="current-password" aria-label="Access Token" required>
         </div>
         <button type="submit" id="submit-btn">
           <span>Connect</span>
