@@ -4,6 +4,7 @@ let ctrlActive = false;
 const token = localStorage.getItem('phoneterm_token');
 if (!token) {
   window.location.href = '/';
+  throw new Error('Redirecting: no auth token.');
 }
 
 // Setup WebSocket connection
@@ -155,7 +156,7 @@ if (logoutBtn) {
     e.preventDefault();
     if (confirm("Disconnect and log out of PhoneTerm?")) {
       localStorage.removeItem('phoneterm_token');
-      ws.close();
+      ws.close(1000, 'logout');
       window.location.href = '/';
     }
   });
