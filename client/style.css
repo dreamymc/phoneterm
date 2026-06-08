@@ -56,3 +56,146 @@ body {
   color: #000;
   border-color: #ffb366;
 }
+
+/* Styling additions for Login UI */
+:root {
+  --bg-primary: #0d0d0d;
+  --card-bg: #161616;
+  --accent-color: #ff9900;
+  --error-color: #ff3333;
+  --text-primary: #f8f8f2;
+  --text-muted: #888888;
+  --border-color: #2b2b2b;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.login-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  padding: 20px;
+}
+
+.login-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  transition: border-color 0.3s ease;
+}
+
+.login-card:focus-within {
+  border-color: var(--accent-color);
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.terminal-prompt {
+  color: var(--accent-color);
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.logo-text {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  font-family: 'Outfit', sans-serif;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 28px 0;
+  font-weight: 300;
+}
+
+.input-group {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+#token-input {
+  width: 100%;
+  background: #222;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 16px;
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  font-family: 'Fira Code', monospace;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+#token-input:focus {
+  border-color: var(--accent-color);
+  background: #282828;
+}
+
+#submit-btn {
+  width: 100%;
+  background-color: var(--accent-color);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity 0.2s;
+}
+
+#submit-btn:active {
+  opacity: 0.8;
+}
+
+.arrow-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.error-msg {
+  color: var(--error-color);
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  margin-top: 14px;
+  min-height: 18px;
+}
+
+/* Shake Keyframes */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.shake {
+  animation: shake 0.4s ease-in-out;
+  border-color: var(--error-color) !important;
+}
+
