@@ -16,6 +16,7 @@ const term = new Terminal({
   fontSize: 14,
   fontFamily: 'Consolas, "Liberation Mono", Menlo, Courier, monospace'
 });
+window.term = term;
 
 const fitAddon = new FitAddon.FitAddon();
 const webLinksAddon = new WebLinksAddon.WebLinksAddon();
