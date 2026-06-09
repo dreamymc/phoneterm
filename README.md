@@ -116,3 +116,55 @@ When PhoneTerm runs in the background (such as when launched automatically via T
 - Before booting the Node.js server, the startup shell script automatically inspects the size of `phoneterm.log`.
 - If the log file size exceeds **5MB** (5,242,880 bytes), it is automatically moved and renamed to `phoneterm.log.old` (overwriting the previous backup log, if any) to prevent disk space exhaustion.
 - A fresh, empty `phoneterm.log` file is then created for the new session.
+
+---
+
+## Mobile Installation (PWA)
+
+PhoneTerm supports Progressive Web App (PWA) features, allowing you to install it directly to your mobile home screen to run in fullscreen mode without any browser search bars or navigation controls:
+
+### On iOS (Safari):
+1. Open the public HTTPS Cloudflare Tunnel URL (or local HTTP URL) in Safari.
+2. Tap the **Share** button (up-arrow box icon) in the bottom navigation bar.
+3. Scroll down and select **Add to Home Screen**.
+4. Confirm the name "PhoneTerm" and tap **Add**.
+
+### On Android (Chrome):
+1. Open the public HTTPS Cloudflare Tunnel URL (or local HTTP URL) in Chrome.
+2. Tap the three-dot **Menu** button in the top right.
+3. Select **Install app** (or **Add to Home screen**).
+4. Tap **Install** to add the application.
+
+---
+
+## Clipboard Access and Copy/Paste
+
+Modern mobile browsers enforce strict security rules that restrict clipboard write and read access (`navigator.clipboard` APIs) exclusively to **Secure Contexts** (HTTPS connections or localhost).
+
+- **Public Cloudflare Tunnel URL:** Supports clipboard access natively. Copying and pasting works seamlessly using the custom context menu inside the terminal.
+- **Local Network HTTP URL (`http://192.168.x.x:3000`):** Browsers block clipboard operations because the connection is non-secure HTTP. If you attempt to use the context menu's **Paste** button, a prompt will warn you about secure context requirements.
+  - *Workaround:* Connect via the HTTPS Cloudflare Tunnel URL, or paste using your native mobile browser menu/keyboard paste actions when typing input.
+
+### Copying & Pasting inside the Terminal:
+1. **To Copy:** Touch and drag to highlight any text in the terminal container. Long-press on the terminal container to show the custom glassmorphic context menu, and click **Copy Selection**.
+2. **To Paste:** Long-press on the terminal container to open the context menu, and click **Paste Clipboard** (only active over secure HTTPS connections).
+
+---
+
+## Frequently Asked Questions (FAQ)
+
+### Q: My interactive tool (e.g., codex, agy, nano) displays weird characters or broken boxes.
+A: This usually happens when the terminal locale is not configured to support UTF-8. Run the following command inside your shell or add it to your shell's startup profile (e.g. `~/.bashrc` or `~/.zshrc`):
+```bash
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+```
+
+### Q: The public URL changes on every server restart.
+A: Yes. Free Cloudflare Quick Tunnels generate a new random subdomain on every launch. If you require a persistent custom URL, you must create a free Cloudflare account, register a custom domain, and configure a persistent named tunnel (using a static tunnel configuration token in your `.env` or system environment).
+
+### Q: How do I update or reset my access token?
+1. Open the `.env` file inside the workspace root.
+2. Update the value of `AUTH_SECRET` to your new desired token string.
+3. Restart the PhoneTerm server (`bash scripts/start.sh` or trigger autostart.sh).
+
