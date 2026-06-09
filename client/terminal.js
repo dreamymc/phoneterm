@@ -9,10 +9,8 @@ if (!token) {
   throw new Error('Redirecting: no auth token.');
 }
 
-// Setup WebSocket connection
-const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsUrl = `${wsProtocol}//${window.location.host}/terminal?token=${encodeURIComponent(token)}`;
-const ws = new WebSocket(wsUrl);
+// Declare ws at the module level
+let ws;
 
 // Initialize xterm.js terminal
 const term = new Terminal({
@@ -36,8 +34,21 @@ term.open(document.getElementById('terminal-container'));
 // Resize terminal and send to server
 function resizeTerminal() {
   try {
+    const topBar = document.getElementById('top-bar');
+    const toolbar = document.getElementById('toolbar');
+    const topBarHeight = topBar ? topBar.offsetHeight : 40;
+    const toolbarHeight = toolbar ? toolbar.offsetHeight : 52;
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const targetHeight = viewportHeight - topBarHeight - toolbarHeight;
+
+    const container = document.getElementById('terminal-container');
+    if (container) {
+      container.style.height = `${targetHeight}px`;
+    }
+
     fitAddon.fit();
-    if (ws.readyState === WebSocket.OPEN) {
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'resize',
         cols: term.cols,
@@ -48,6 +59,14 @@ function resizeTerminal() {
     console.error("Error running resizeTerminal:", err);
   }
 }
+
+// Run initial resize before websocket setup
+resizeTerminal();
+
+// Setup WebSocket connection
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const wsUrl = `${wsProtocol}//${window.location.host}/terminal?token=${encodeURIComponent(token)}`;
+ws = new WebSocket(wsUrl);
 
 ws.onopen = () => {
   console.log("WebSocket connected.");
@@ -95,7 +114,7 @@ ws.onerror = (err) => {
 
 // Handle user typing
 term.onData((data) => {
-  if (ws.readyState !== WebSocket.OPEN) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
   if (ctrlActive) {
     // Check if the input is a single alphabetical character
@@ -146,7 +165,7 @@ document.querySelectorAll('.key-btn[data-seq]').forEach(btn => {
     e.preventDefault();
     const seqName = btn.getAttribute('data-seq');
     const seq = seqMap[seqName];
-    if (seq && ws.readyState === WebSocket.OPEN) {
+    if (seq && ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'input', data: seq }));
     }
   });
@@ -168,7 +187,9 @@ if (logoutBtn) {
     e.preventDefault();
     if (confirm("Disconnect and log out of PhoneTerm?")) {
       localStorage.removeItem('phoneterm_token');
-      ws.close(1000, 'logout');
+      if (ws) {
+        ws.close(1000, 'logout');
+      }
       window.location.href = '/';
     }
   });
@@ -179,7 +200,7 @@ if (shellSelect) {
   shellSelect.value = activeShell;
 
   shellSelect.addEventListener('change', () => {
-    if (ws.readyState !== WebSocket.OPEN) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
       alert("Unable to switch shell: Connection is closed.");
       shellSelect.value = activeShell;
       return;
