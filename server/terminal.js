@@ -6,6 +6,11 @@ const config = require('./config');
 // Detect and cache WSL mount point at module level to avoid repeated disk checks
 const WSL_MOUNT = fs.existsSync('/mnt/c') ? '/mnt/c' : (fs.existsSync('/c') ? '/c' : null);
 
+const parseDim = (val, defaultValue) => {
+  const parsed = parseInt(val, 10);
+  return (isNaN(parsed) || parsed < 1) ? defaultValue : parsed;
+};
+
 /**
  * Resolves the absolute path for the requested shell executable.
  */
@@ -72,6 +77,7 @@ function spawnTerminal(ws, initialShell = 'bash') {
           if (fs.existsSync(profilePath)) {
             cwd = profilePath;
           } else {
+            console.warn(`Windows user profile path "${profilePath}" does not exist. Falling back to mount: ${WSL_MOUNT}`);
             cwd = WSL_MOUNT;
           }
         } else {
@@ -159,8 +165,8 @@ function spawnTerminal(ws, initialShell = 'bash') {
           term.write(msg.data);
         }
       } else if (msg.type === 'resize') {
-        cols = Math.max(1, parseInt(msg.cols, 10) || 80);
-        rows = Math.max(1, parseInt(msg.rows, 10) || 24);
+        cols = Math.min(1000, parseDim(msg.cols, 80));
+        rows = Math.min(1000, parseDim(msg.rows, 24));
         if (term) {
           term.resize(cols, rows);
         }
