@@ -14,6 +14,18 @@ let ws;
 let lastCols = null;
 let lastRows = null;
 
+// Reconnection state variables
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BACKOFF_DELAYS = [2000, 4000, 8000, 16000, 30000];
+let reconnectTimer = null;
+
+// DOM element references for reconnection
+const reconnectOverlay = document.getElementById('reconnect-overlay');
+const reconnectStatus = document.getElementById('reconnect-status');
+const reconnectBtn = document.getElementById('reconnect-btn');
+const spinner = reconnectOverlay ? reconnectOverlay.querySelector('.spinner') : null;
+
 // Initialize xterm.js terminal
 const term = new Terminal({
   cursorBlink: true,
@@ -69,55 +81,125 @@ function resizeTerminal() {
 // Run initial resize before websocket setup
 resizeTerminal();
 
-// Setup WebSocket connection
-const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsUrl = `${wsProtocol}//${window.location.host}/terminal?token=${encodeURIComponent(token)}`;
-ws = new WebSocket(wsUrl);
+// Setup WebSocket connection with reconnection logic
+function connectWebSocket() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
 
-ws.onopen = () => {
-  console.log("WebSocket connected.");
-  resizeTerminal();
-};
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.host}/terminal?token=${encodeURIComponent(token)}`;
+  ws = new WebSocket(wsUrl);
 
-ws.onmessage = (event) => {
-  try {
-    const msg = JSON.parse(event.data);
-    if (msg.type === 'output') {
-      term.write(msg.data);
-    } else if (msg.type === 'exit') {
-      term.write(`\r\n\x1b[33m[Shell exited — ${msg.shell || activeShell} returned code ${msg.code}]\x1b[0m\r\n`);
-      term.write(`\x1b[32m[Use the dropdown at the top to spawn another shell or reconnect]\x1b[0m\r\n`);
-      if (shellSelect) {
-        shellSelect.value = "";
-      }
-      activeShell = "";
-    } else if (msg.type === 'shell-active') {
-      activeShell = msg.shell;
-      if (shellSelect) {
-        shellSelect.value = msg.shell;
-      }
+  ws.onopen = () => {
+    console.log("WebSocket connected.");
+    reconnectAttempts = 0;
+    if (reconnectOverlay) {
+      reconnectOverlay.classList.add('hidden');
     }
-  } catch (err) {
-    console.error("Error parsing WebSocket message:", err);
-  }
-};
+    resizeTerminal();
+  };
 
-ws.onclose = (event) => {
-  if (event.code === 4001) {
-    term.write('\r\n[Authentication failed or expired. Redirecting to login...]\r\n');
-    localStorage.removeItem('phoneterm_token');
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 2000);
-  } else {
-    term.write('\r\n[Connection closed]\r\n');
-  }
-};
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'output') {
+        term.write(msg.data);
+      } else if (msg.type === 'exit') {
+        term.write(`\r\n\x1b[33m[Shell exited — ${msg.shell || activeShell} returned code ${msg.code}]\x1b[0m\r\n`);
+        term.write(`\x1b[32m[Use the dropdown at the top to spawn another shell or reconnect]\x1b[0m\r\n`);
+        if (shellSelect) {
+          shellSelect.value = "";
+        }
+        activeShell = "";
+      } else if (msg.type === 'shell-active') {
+        activeShell = msg.shell;
+        if (shellSelect) {
+          shellSelect.value = msg.shell;
+        }
+      }
+    } catch (err) {
+      console.error("Error parsing WebSocket message:", err);
+    }
+  };
 
-ws.onerror = (err) => {
-  console.error("WebSocket error:", err);
-  term.write('\r\n[WebSocket connection error]\r\n');
-};
+  ws.onclose = (event) => {
+    if (event.code === 4001) {
+      term.write('\r\n[Authentication failed or expired. Redirecting to login...]\r\n');
+      localStorage.removeItem('phoneterm_token');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    } else if (event.reason === 'logout') {
+      term.write('\r\n[Logged out]\r\n');
+    } else {
+      term.write('\r\n[Connection lost]\r\n');
+      handleReconnect();
+    }
+  };
+
+  ws.onerror = (err) => {
+    console.error("WebSocket error:", err);
+    term.write('\r\n[WebSocket connection error]\r\n');
+  };
+}
+
+function handleReconnect() {
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    if (reconnectStatus) {
+      reconnectStatus.textContent = "Connection failed. Please retry manually.";
+    }
+    if (reconnectBtn) {
+      reconnectBtn.classList.remove('hidden');
+    }
+    if (spinner) {
+      spinner.classList.add('hidden');
+    }
+    return;
+  }
+
+  const delay = BACKOFF_DELAYS[reconnectAttempts];
+  reconnectAttempts++;
+
+  if (reconnectOverlay) {
+    reconnectOverlay.classList.remove('hidden');
+  }
+  if (spinner) {
+    spinner.classList.remove('hidden');
+  }
+  if (reconnectBtn) {
+    reconnectBtn.classList.add('hidden');
+  }
+
+  const seconds = delay / 1000;
+  if (reconnectStatus) {
+    reconnectStatus.textContent = `Connection lost. Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${seconds} seconds...`;
+  }
+
+  reconnectTimer = setTimeout(connectWebSocket, delay);
+}
+
+// Register manual reconnect click event listener
+if (reconnectBtn) {
+  reconnectBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    reconnectAttempts = 0;
+    if (reconnectStatus) {
+      reconnectStatus.textContent = "Reconnecting...";
+    }
+    if (reconnectBtn) {
+      reconnectBtn.classList.add('hidden');
+    }
+    if (spinner) {
+      spinner.classList.remove('hidden');
+    }
+    connectWebSocket();
+  });
+}
+
+// Start the initial connection on startup
+connectWebSocket();
 
 // Handle user typing
 term.onData((data) => {
