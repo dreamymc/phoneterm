@@ -64,6 +64,7 @@ function spawnTerminal(ws, initialShell = 'bash') {
   let activeExitListener = null;
   let cols = 80;
   let rows = 24;
+  let currentShell = initialShell;
 
   function createPty(shellName) {
     const shellPath = resolveShellPath(shellName);
@@ -126,6 +127,7 @@ function spawnTerminal(ws, initialShell = 'bash') {
   function spawnSession(shellName) {
     try {
       term = createPty(shellName);
+      currentShell = shellName;
       if (ws.readyState === ws.OPEN) {
         ws.send(JSON.stringify({ type: 'shell-active', shell: shellName }));
       }
@@ -184,6 +186,7 @@ function spawnTerminal(ws, initialShell = 'bash') {
               type: 'output',
               data: `\r\n\x1b[31mError: Shell "${targetShell}" is not available.\x1b[0m\r\n`
             }));
+            ws.send(JSON.stringify({ type: 'shell-active', shell: currentShell }));
           }
         } else {
           teardownSession();

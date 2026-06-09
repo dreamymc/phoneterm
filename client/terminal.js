@@ -187,7 +187,6 @@ if (shellSelect) {
     const selectedShell = shellSelect.value;
     const displayName = shellSelect.options[shellSelect.selectedIndex].text;
     if (confirm(`Switch to ${displayName}? The current session will be terminated.`)) {
-      activeShell = selectedShell;
       ws.send(JSON.stringify({
         type: 'shell',
         shell: selectedShell,
