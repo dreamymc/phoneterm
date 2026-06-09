@@ -126,6 +126,9 @@ function spawnTerminal(ws, initialShell = 'bash') {
   function spawnSession(shellName) {
     try {
       term = createPty(shellName);
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify({ type: 'shell-active', shell: shellName }));
+      }
 
       activeDataListener = term.onData((data) => {
         if (ws.readyState === ws.OPEN) {

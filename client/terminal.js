@@ -1,5 +1,6 @@
 let ctrlActive = false;
 let activeShell = 'bash';
+const shellSelect = document.getElementById('shell-select');
 
 // Retrieve token from local storage
 const token = localStorage.getItem('phoneterm_token');
@@ -59,8 +60,17 @@ ws.onmessage = (event) => {
     if (msg.type === 'output') {
       term.write(msg.data);
     } else if (msg.type === 'exit') {
-      term.write(`\r\n\x1b[33m[Shell exited — ${msg.shell} returned code ${msg.code}]\x1b[0m\r\n`);
+      term.write(`\r\n\x1b[33m[Shell exited — ${msg.shell || activeShell} returned code ${msg.code}]\x1b[0m\r\n`);
       term.write(`\x1b[32m[Use the dropdown at the top to spawn another shell or reconnect]\x1b[0m\r\n`);
+      if (shellSelect) {
+        shellSelect.value = "";
+      }
+      activeShell = "";
+    } else if (msg.type === 'shell-active') {
+      activeShell = msg.shell;
+      if (shellSelect) {
+        shellSelect.value = msg.shell;
+      }
     }
   } catch (err) {
     console.error("Error parsing WebSocket message:", err);
@@ -165,23 +175,25 @@ if (logoutBtn) {
 }
 
 // Handle Shell Switcher Selection
-const shellSelect = document.getElementById('shell-select');
 if (shellSelect) {
   shellSelect.value = activeShell;
 
   shellSelect.addEventListener('change', () => {
+    if (ws.readyState !== WebSocket.OPEN) {
+      alert("Unable to switch shell: Connection is closed.");
+      shellSelect.value = activeShell;
+      return;
+    }
     const selectedShell = shellSelect.value;
     const displayName = shellSelect.options[shellSelect.selectedIndex].text;
     if (confirm(`Switch to ${displayName}? The current session will be terminated.`)) {
       activeShell = selectedShell;
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'shell',
-          shell: selectedShell,
-          cols: term.cols,
-          rows: term.rows
-        }));
-      }
+      ws.send(JSON.stringify({
+        type: 'shell',
+        shell: selectedShell,
+        cols: term.cols,
+        rows: term.rows
+      }));
     } else {
       shellSelect.value = activeShell;
     }
