@@ -1,4 +1,5 @@
 let ctrlActive = false;
+let activeShell = 'bash';
 
 // Retrieve token from local storage
 const token = localStorage.getItem('phoneterm_token');
@@ -58,7 +59,8 @@ ws.onmessage = (event) => {
     if (msg.type === 'output') {
       term.write(msg.data);
     } else if (msg.type === 'exit') {
-      term.write(`\r\n[Shell exited with code ${msg.code}]\r\n`);
+      term.write(`\r\n\x1b[33m[Shell exited — ${msg.shell} returned code ${msg.code}]\x1b[0m\r\n`);
+      term.write(`\x1b[32m[Use the dropdown at the top to spawn another shell or reconnect]\x1b[0m\r\n`);
     }
   } catch (err) {
     console.error("Error parsing WebSocket message:", err);
@@ -158,6 +160,30 @@ if (logoutBtn) {
       localStorage.removeItem('phoneterm_token');
       ws.close(1000, 'logout');
       window.location.href = '/';
+    }
+  });
+}
+
+// Handle Shell Switcher Selection
+const shellSelect = document.getElementById('shell-select');
+if (shellSelect) {
+  shellSelect.value = activeShell;
+
+  shellSelect.addEventListener('change', () => {
+    const selectedShell = shellSelect.value;
+    const displayName = shellSelect.options[shellSelect.selectedIndex].text;
+    if (confirm(`Switch to ${displayName}? The current session will be terminated.`)) {
+      activeShell = selectedShell;
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'shell',
+          shell: selectedShell,
+          cols: term.cols,
+          rows: term.rows
+        }));
+      }
+    } else {
+      shellSelect.value = activeShell;
     }
   });
 }
