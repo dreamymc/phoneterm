@@ -16,9 +16,10 @@ const { spawnTerminal } = require('./terminal');
 const { startTunnel } = require('./tunnel');
 
 const jwt = require('jsonwebtoken');
-const { authRouter } = require('./auth');
+const { authRouter, revokedTokens } = require('./auth');
 
 const app = express();
+app.set('trust proxy', true);
 const server = http.createServer(app);
 
 // Create WebSocket server attached to the same HTTP server
@@ -26,6 +27,14 @@ const wss = new WebSocket.Server({ noServer: true });
 
 // Parse JSON request bodies
 app.use(express.json());
+
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  if (host.endsWith('.trycloudflare.com')) {
+    res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests');
+  }
+  next();
+});
 
 // Serve client directory statically
 app.use(express.static(path.join(__dirname, '../client')));
@@ -48,6 +57,25 @@ server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
 
   if (pathname === '/terminal') {
+    // Validate WebSocket upgrade Origin header
+    const origin = request.headers.origin;
+    if (origin) {
+      try {
+        const parsedOrigin = new URL(origin);
+        if (parsedOrigin.host !== request.headers.host) {
+          console.warn(`WebSocket upgrade rejected: Origin mismatch (${parsedOrigin.host} !== ${request.headers.host})`);
+          socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+      } catch (err) {
+        console.warn(`WebSocket upgrade rejected: Invalid Origin header`);
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+    }
+
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
@@ -69,10 +97,16 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
-    jwt.verify(token, config.JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, config.JWT_SECRET, { algorithms: ['HS256'] }, (err, decoded) => {
       if (err) {
         console.log(`WebSocket connection rejected: ${err.message}`);
         ws.close(4001, 'Unauthorized: Invalid token');
+        return;
+      }
+
+      if (decoded && decoded.jti && revokedTokens.has(decoded.jti)) {
+        console.log('WebSocket connection rejected: Token has been revoked');
+        ws.close(4001, 'Unauthorized: Token has been revoked');
         return;
       }
 
@@ -83,7 +117,8 @@ wss.on('connection', (ws, req) => {
 
       console.log('WebSocket client successfully authenticated.');
       const sessionId = decoded && decoded.sessionId ? decoded.sessionId : 'default-session';
-      spawnTerminal(ws, sessionId, 'bash');
+      const jti = decoded && decoded.jti ? decoded.jti : null;
+      spawnTerminal(ws, sessionId, 'bash', jti);
     });
   } catch (err) {
     console.error('Error during WebSocket verification:', err);
@@ -178,7 +213,11 @@ server.listen(config.PORT, '0.0.0.0', async () => {
   if (publicUrl) {
     console.log(chalk.green(`║  Public:  ${publicUrl.padEnd(51)} ║`));
   }
-  console.log(chalk.green(`║  Token:   ${config.AUTH_SECRET.padEnd(51)} ║`));
+  if (process.stdout.isTTY) {
+    console.log(chalk.green(`║  Token:   ${config.AUTH_SECRET.padEnd(51)} ║`));
+  } else {
+    console.log(chalk.green(`║  Token:   [hidden in logs]${' '.repeat(35)} ║`));
+  }
   console.log(chalk.green('╚' + '═'.repeat(63) + '╝'));
   console.log('');
 
