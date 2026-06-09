@@ -3,23 +3,48 @@ const fs = require('fs');
 const os = require('os');
 const config = require('./config');
 
+// Detect and cache WSL mount point at module level to avoid repeated disk checks
+const WSL_MOUNT = fs.existsSync('/mnt/c') ? '/mnt/c' : (fs.existsSync('/c') ? '/c' : null);
+
 /**
  * Resolves the absolute path for the requested shell executable.
  */
 function resolveShellPath(shell) {
-  const mount = fs.existsSync('/mnt/c') ? '/mnt/c' : (fs.existsSync('/c') ? '/c' : null);
   switch (shell) {
     case 'bash':
       return '/bin/bash';
     case 'zsh':
-      if (fs.existsSync('/bin/zsh')) {
-        return '/bin/zsh';
+      return fs.existsSync('/bin/zsh') ? '/bin/zsh' : '/bin/bash';
+    case 'cmd': {
+      if (!WSL_MOUNT) return null;
+      const candidates = [
+        `${WSL_MOUNT}/Windows/System32/cmd.exe`,
+        `${WSL_MOUNT}/windows/system32/cmd.exe`,
+        `${WSL_MOUNT}/WINDOWS/SYSTEM32/cmd.exe`
+      ];
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
       }
-      return '/bin/bash';
-    case 'cmd':
-      return mount ? `${mount}/Windows/System32/cmd.exe` : null;
-    case 'powershell':
-      return mount ? `${mount}/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` : null;
+      return null;
+    }
+    case 'powershell': {
+      if (!WSL_MOUNT) return null;
+      const candidates = [
+        `${WSL_MOUNT}/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`,
+        `${WSL_MOUNT}/windows/system32/windowspowershell/v1.0/powershell.exe`,
+        `${WSL_MOUNT}/WINDOWS/SYSTEM32/WINDOWSPOWERSHELL/V1.0/powershell.exe`,
+        `${WSL_MOUNT}/Windows/System32/windowspowershell/v1.0/powershell.exe`,
+        `${WSL_MOUNT}/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe`
+      ];
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      }
+      return null;
+    }
     default:
       return '/bin/bash';
   }
@@ -41,12 +66,11 @@ function spawnTerminal(ws, initialShell = 'bash') {
 
     let cwd = homeDir;
     if (shellName === 'cmd' || shellName === 'powershell') {
-      const mount = fs.existsSync('/mnt/c') ? '/mnt/c' : (fs.existsSync('/c') ? '/c' : null);
-      if (mount) {
+      if (WSL_MOUNT) {
         if (config.WINDOWS_USERNAME && config.WINDOWS_USERNAME.trim() !== '') {
-          cwd = `${mount}/Users/${config.WINDOWS_USERNAME}`;
+          cwd = `${WSL_MOUNT}/Users/${config.WINDOWS_USERNAME}`;
         } else {
-          cwd = mount;
+          cwd = WSL_MOUNT;
         }
       }
     }
@@ -89,20 +113,36 @@ function spawnTerminal(ws, initialShell = 'bash') {
   }
 
   function spawnSession(shellName) {
-    term = createPty(shellName);
+    try {
+      term = createPty(shellName);
 
-    activeDataListener = term.onData((data) => {
+      activeDataListener = term.onData((data) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({ type: 'output', data }));
+        }
+      });
+
+      activeExitListener = term.onExit(({ exitCode }) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({ type: 'exit', shell: shellName, code: exitCode }));
+        }
+        cleanupPty();
+      });
+    } catch (err) {
+      console.error(`Error spawning shell ${shellName}:`, err);
       if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify({ type: 'output', data }));
+        ws.send(JSON.stringify({
+          type: 'output',
+          data: `\r\n\x1b[31mError spawning shell ${shellName}: ${err.message}\x1b[0m\r\n`
+        }));
       }
-    });
-
-    activeExitListener = term.onExit(({ exitCode }) => {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify({ type: 'exit', shell: shellName, code: exitCode }));
+      if (shellName !== 'bash') {
+        spawnSession('bash');
+        return;
       }
-    });
+    }
 
+    ws.off('message', messageHandler);
     ws.on('message', messageHandler);
   }
 
