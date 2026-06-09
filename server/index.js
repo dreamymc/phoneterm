@@ -91,9 +91,9 @@ wss.on('connection', (ws, req) => {
 });
 
 /**
- * Detects the Windows host username via WSL interop cmd.exe.
+ * Detects the Windows host %USERPROFILE% via WSL interop cmd.exe and translates it to a WSL path.
  */
-function detectWindowsUsername() {
+function detectWindowsUserProfile() {
   return new Promise((resolve) => {
     const paths = [
       { cmd: '/mnt/c/Windows/System32/cmd.exe', cwd: '/mnt/c' },
@@ -114,12 +114,29 @@ function detectWindowsUsername() {
       return resolve(null);
     }
 
-    exec(`"${target.cmd}" /c echo %USERNAME% < /dev/null`, { timeout: 2000, cwd: target.cwd }, (error, stdout) => {
+    exec(`"${target.cmd}" /c "echo %USERPROFILE%" < /dev/null`, { timeout: 2000, cwd: target.cwd }, (error, stdout) => {
       if (error) {
         return resolve(null);
       }
-      const username = stdout.trim();
-      resolve(username || null);
+      const rawProfile = stdout.trim();
+      if (!rawProfile) {
+        return resolve(null);
+      }
+
+      const match = rawProfile.match(/^([a-zA-Z]):\\(.*)$/);
+      if (!match) {
+        return resolve(null);
+      }
+
+      const drive = match[1].toLowerCase();
+      const relativePath = match[2].replace(/\\/g, '/');
+      const mountPrefix = fs.existsSync(`/mnt/${drive}`) ? `/mnt/${drive}` : (fs.existsSync(`/${drive}`) ? `/${drive}` : null);
+      if (!mountPrefix) {
+        return resolve(null);
+      }
+
+      const wslPath = `${mountPrefix}/${relativePath}`;
+      resolve(wslPath);
     });
   });
 }
@@ -129,9 +146,9 @@ server.listen(config.PORT, '0.0.0.0', async () => {
   const localIp = ip.address();
   const localUrl = `http://${localIp}:${config.PORT}`;
 
-  // Query and cache Windows username asynchronously
+  // Query and cache Windows user profile path asynchronously
   try {
-    config.WINDOWS_USERNAME = await detectWindowsUsername();
+    config.WINDOWS_USERPROFILE = await detectWindowsUserProfile();
   } catch (err) {
     // Ignore
   }

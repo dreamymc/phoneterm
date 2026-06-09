@@ -73,12 +73,11 @@ function spawnTerminal(ws, initialShell = 'bash') {
     let cwd = homeDir;
     if (shellName === 'cmd' || shellName === 'powershell') {
       if (WSL_MOUNT) {
-        if (config.WINDOWS_USERNAME && config.WINDOWS_USERNAME.trim() !== '') {
-          const profilePath = `${WSL_MOUNT}/Users/${config.WINDOWS_USERNAME}`;
-          if (fs.existsSync(profilePath)) {
-            cwd = profilePath;
+        if (config.WINDOWS_USERPROFILE && config.WINDOWS_USERPROFILE.trim() !== '') {
+          if (fs.existsSync(config.WINDOWS_USERPROFILE)) {
+            cwd = config.WINDOWS_USERPROFILE;
           } else {
-            console.warn(`Windows user profile path "${profilePath}" does not exist. Falling back to mount: ${WSL_MOUNT}`);
+            console.warn(`Windows user profile path "${config.WINDOWS_USERPROFILE}" does not exist. Falling back to mount: ${WSL_MOUNT}`);
             cwd = WSL_MOUNT;
           }
         } else {

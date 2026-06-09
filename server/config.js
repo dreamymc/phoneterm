@@ -22,5 +22,5 @@ module.exports = {
   AUTH_SECRET,
   JWT_SECRET,
   JWT_EXPIRY,
-  WINDOWS_USERNAME: null
+  WINDOWS_USERPROFILE: null
 };
