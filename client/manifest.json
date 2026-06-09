@@ -1,0 +1,18 @@
+{
+  "name": "PhoneTerm",
+  "short_name": "PhoneTerm",
+  "description": "Secure mobile pseudo-terminal interface for WSL 2",
+  "start_url": "/term",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
