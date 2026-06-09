@@ -2,6 +2,7 @@ const pty = require('node-pty');
 const fs = require('fs');
 const os = require('os');
 const config = require('./config');
+const { revokedTokens } = require('./auth');
 
 // Detect and cache WSL mount point at module level to avoid repeated disk checks
 const WSL_MOUNT = fs.existsSync('/mnt/c') ? '/mnt/c' : (fs.existsSync('/c') ? '/c' : null);
@@ -254,6 +255,9 @@ function bindSocketToSession(ws, sessionId, session) {
     const reasonStr = reason ? reason.toString() : '';
 
     if (reasonStr === 'logout') {
+      if (session.jti) {
+        revokedTokens.add(session.jti);
+      }
       cleanupSession(sessionId);
     } else {
       session.ws = null;
@@ -270,9 +274,10 @@ function bindSocketToSession(ws, sessionId, session) {
 /**
  * Spawns or restores a PTY session and binds its stdin/stdout to the given WebSocket.
  */
-function spawnTerminal(ws, sessionId, initialShell = 'bash') {
+function spawnTerminal(ws, sessionId, initialShell = 'bash', jti = null) {
   if (activeSessions.has(sessionId)) {
     const session = activeSessions.get(sessionId);
+    session.jti = jti;
 
     // Clear the disconnect timeout if running
     if (session.disconnectTimeout) {
@@ -316,7 +321,8 @@ function spawnTerminal(ws, sessionId, initialShell = 'bash') {
       ws: ws,
       activeDataListener: null,
       activeExitListener: null,
-      disconnectTimeout: null
+      disconnectTimeout: null,
+      jti: jti
     };
     activeSessions.set(sessionId, session);
 
