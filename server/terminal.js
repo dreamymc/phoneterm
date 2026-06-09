@@ -6,6 +6,9 @@ const config = require('./config');
 // Detect and cache WSL mount point at module level to avoid repeated disk checks
 const WSL_MOUNT = fs.existsSync('/mnt/c') ? '/mnt/c' : (fs.existsSync('/c') ? '/c' : null);
 
+const activeSessions = new Map();
+const MAX_BUFFER_LENGTH = 50 * 1024; // 50KB
+
 const parseDim = (val, defaultValue) => {
   const parsed = parseInt(val, 10);
   return (isNaN(parsed) || parsed < 1) ? defaultValue : parsed;
@@ -56,17 +59,45 @@ function resolveShellPath(shell) {
 }
 
 /**
- * Spawns a PTY process and binds its stdin/stdout to the given WebSocket.
+ * Cleans up and removes a session.
  */
-function spawnTerminal(ws, initialShell = 'bash') {
-  let term = null;
-  let activeDataListener = null;
-  let activeExitListener = null;
-  let cols = 80;
-  let rows = 24;
-  let currentShell = initialShell;
+function cleanupSession(sessionId) {
+  const session = activeSessions.get(sessionId);
+  if (!session) return;
 
-  function createPty(shellName) {
+  if (session.disconnectTimeout) {
+    clearTimeout(session.disconnectTimeout);
+    session.disconnectTimeout = null;
+  }
+
+  if (session.activeDataListener) {
+    session.activeDataListener.dispose();
+    session.activeDataListener = null;
+  }
+
+  if (session.activeExitListener) {
+    session.activeExitListener.dispose();
+    session.activeExitListener = null;
+  }
+
+  if (session.term) {
+    try {
+      session.term.kill();
+    } catch (e) {
+      console.error(`Error killing PTY process for session ${sessionId}:`, e);
+    }
+    session.term = null;
+  }
+
+  session.ws = null;
+  activeSessions.delete(sessionId);
+}
+
+/**
+ * Spawns a PTY process for the session.
+ */
+function spawnSession(sessionId, session, shellName) {
+  try {
     const shellPath = resolveShellPath(shellName);
     const homeDir = process.env.HOME || os.homedir();
 
@@ -86,10 +117,10 @@ function spawnTerminal(ws, initialShell = 'bash') {
       }
     }
 
-    return pty.spawn(shellPath, [], {
+    session.term = pty.spawn(shellPath, [], {
       name: 'xterm-256color',
-      cols: cols,
-      rows: rows,
+      cols: session.cols,
+      rows: session.rows,
       cwd: cwd,
       env: {
         ...process.env,
@@ -100,83 +131,65 @@ function spawnTerminal(ws, initialShell = 'bash') {
         LANG: process.env.LANG || 'en_US.UTF-8',
       }
     });
-  }
 
-  function cleanupPty() {
-    if (activeDataListener) {
-      activeDataListener.dispose();
-      activeDataListener = null;
-    }
-    if (activeExitListener) {
-      activeExitListener.dispose();
-      activeExitListener = null;
-    }
-    if (term) {
-      try {
-        term.kill();
-      } catch (e) {
-        console.error("Error killing PTY process:", e);
-      }
-      term = null;
-    }
-  }
+    session.shell = shellName;
 
-  function teardownSession() {
-    cleanupPty();
-    ws.off('message', messageHandler);
-  }
-
-  function spawnSession(shellName) {
-    try {
-      term = createPty(shellName);
-      currentShell = shellName;
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify({ type: 'shell-active', shell: shellName }));
-      }
-
-      // Forward immediately to the WebSocket with absolutely no buffering, debouncing, or batching
-      activeDataListener = term.onData((data) => {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(JSON.stringify({ type: 'output', data }));
-        }
-      });
-
-      activeExitListener = term.onExit(({ exitCode }) => {
-        if (ws.readyState === ws.OPEN) {
-          ws.send(JSON.stringify({ type: 'exit', shell: shellName, code: exitCode }));
-        }
-        cleanupPty();
-      });
-    } catch (err) {
-      console.error(`Error spawning shell ${shellName}:`, err);
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'output',
-          data: `\r\n\x1b[31mError spawning shell ${shellName}: ${err.message}\x1b[0m\r\n`
-        }));
-      }
-      if (shellName !== 'bash') {
-        spawnSession('bash');
-        return;
-      }
+    if (session.ws && session.ws.readyState === session.ws.OPEN) {
+      session.ws.send(JSON.stringify({ type: 'shell-active', shell: shellName }));
     }
 
-    ws.off('message', messageHandler);
-    ws.on('message', messageHandler);
-  }
+    session.activeDataListener = session.term.onData((data) => {
+      // Append to the scrollback buffer
+      session.buffer += data;
+      if (session.buffer.length > MAX_BUFFER_LENGTH) {
+        session.buffer = session.buffer.slice(session.buffer.length - MAX_BUFFER_LENGTH);
+      }
 
-  function messageHandler(message) {
+      // Forward to websocket
+      if (session.ws && session.ws.readyState === session.ws.OPEN) {
+        session.ws.send(JSON.stringify({ type: 'output', data }));
+      }
+    });
+
+    session.activeExitListener = session.term.onExit(({ exitCode }) => {
+      console.log(`PTY process exited for session ${sessionId} with code ${exitCode}`);
+      if (session.ws && session.ws.readyState === session.ws.OPEN) {
+        session.ws.send(JSON.stringify({ type: 'exit', shell: shellName, code: exitCode }));
+      }
+      cleanupSession(sessionId);
+    });
+
+  } catch (err) {
+    console.error(`Error spawning shell ${shellName} in session ${sessionId}:`, err);
+    if (session.ws && session.ws.readyState === session.ws.OPEN) {
+      session.ws.send(JSON.stringify({
+        type: 'output',
+        data: `\r\n\x1b[31mError spawning shell ${shellName}: ${err.message}\x1b[0m\r\n`
+      }));
+    }
+    if (shellName !== 'bash') {
+      spawnSession(sessionId, session, 'bash');
+      return;
+    }
+  }
+}
+
+/**
+ * Binds message and close event handlers of a WebSocket connection to a session.
+ */
+function bindSocketToSession(ws, sessionId, session) {
+  const messageHandler = (message) => {
     try {
       const msg = JSON.parse(message);
       if (msg.type === 'input') {
-        if (term) {
-          term.write(msg.data);
+        if (session.term) {
+          session.term.write(msg.data);
         }
       } else if (msg.type === 'resize') {
-        cols = Math.min(1000, parseDim(msg.cols, 80));
-        rows = Math.min(1000, parseDim(msg.rows, 24));
-        if (term) {
-          term.resize(cols, rows);
+        session.cols = Math.min(1000, parseDim(msg.cols, 80));
+        session.rows = Math.min(1000, parseDim(msg.rows, 24));
+        if (session.term) {
+          session.term.resize(session.cols, session.rows);
         }
       } else if (msg.type === 'shell') {
         const targetShell = msg.shell;
@@ -189,29 +202,118 @@ function spawnTerminal(ws, initialShell = 'bash') {
               type: 'output',
               data: `\r\n\x1b[31mError: Shell "${targetShell}" is not available.\x1b[0m\r\n`
             }));
-            ws.send(JSON.stringify({ type: 'shell-active', shell: currentShell }));
+            ws.send(JSON.stringify({ type: 'shell-active', shell: session.shell }));
           }
         } else {
-          teardownSession();
-          spawnSession(targetShell);
-          if (term) {
-            term.resize(cols, rows);
+          // Reset buffer on shell change
+          session.buffer = '';
+
+          // Clean up current PTY first
+          if (session.activeDataListener) {
+            session.activeDataListener.dispose();
+            session.activeDataListener = null;
           }
+          if (session.activeExitListener) {
+            session.activeExitListener.dispose();
+            session.activeExitListener = null;
+          }
+          if (session.term) {
+            try {
+              session.term.kill();
+            } catch (e) {
+              console.error(`Error killing PTY process for shell switch in session ${sessionId}:`, e);
+            }
+            session.term = null;
+          }
+
+          spawnSession(sessionId, session, targetShell);
         }
       }
     } catch (err) {
-      console.error("Error processing client message:", err);
+      console.error(`Error processing client message for session ${sessionId}:`, err);
     }
+  };
+
+  const closeHandler = (code, reason) => {
+    // Only handle if this socket is still the active socket for the session
+    if (session.ws !== ws) {
+      return;
+    }
+
+    const reasonStr = reason ? reason.toString() : '';
+
+    if (reasonStr === 'logout') {
+      cleanupSession(sessionId);
+    } else {
+      session.ws = null;
+      session.disconnectTimeout = setTimeout(() => {
+        cleanupSession(sessionId);
+      }, 60000);
+    }
+  };
+
+  ws.on('message', messageHandler);
+  ws.on('close', closeHandler);
+}
+
+/**
+ * Spawns or restores a PTY session and binds its stdin/stdout to the given WebSocket.
+ */
+function spawnTerminal(ws, sessionId, initialShell = 'bash') {
+  if (activeSessions.has(sessionId)) {
+    const session = activeSessions.get(sessionId);
+
+    // Clear the disconnect timeout if running
+    if (session.disconnectTimeout) {
+      clearTimeout(session.disconnectTimeout);
+      session.disconnectTimeout = null;
+    }
+
+    // Close the previous WebSocket if it exists and is different from the new one
+    if (session.ws && session.ws !== ws) {
+      try {
+        session.ws.close();
+      } catch (e) {
+        console.error(`Error closing old WebSocket for session ${sessionId}:`, e);
+      }
+    }
+
+    // Bind the new WebSocket
+    session.ws = ws;
+
+    // Send the rolling scrollback history buffer
+    if (session.buffer && ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'output', data: session.buffer }));
+    }
+
+    // Send the active shell state notification
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'shell-active', shell: session.shell }));
+    }
+
+    // Bind WebSocket message handlers and close handler to this session
+    bindSocketToSession(ws, sessionId, session);
+  } else {
+    // Create a new session object
+    const session = {
+      term: null,
+      shell: initialShell,
+      cols: 80,
+      rows: 24,
+      buffer: '',
+      ws: ws,
+      activeDataListener: null,
+      activeExitListener: null,
+      disconnectTimeout: null
+    };
+    activeSessions.set(sessionId, session);
+
+    // Spawn the initial PTY process
+    spawnSession(sessionId, session, initialShell);
+
+    // Bind WebSocket message handlers and close handler to this session
+    bindSocketToSession(ws, sessionId, session);
   }
-
-  // Spawn initial PTY and bind listeners
-  spawnSession(initialShell);
-
-  // Clean up PTY on connection close
-  ws.on('close', () => {
-    console.log("WebSocket connection closed. Tearing down session...");
-    teardownSession();
-  });
 }
 
 module.exports = {

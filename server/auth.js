@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
 
 const router = express.Router();
@@ -38,7 +39,7 @@ router.post('/login', (req, res) => {
 
   if (verifyToken(token)) {
     const jwtToken = jwt.sign(
-      { authenticated: true },
+      { authenticated: true, sessionId: uuidv4() },
       config.JWT_SECRET,
       { expiresIn: config.JWT_EXPIRY }
     );

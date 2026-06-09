@@ -69,7 +69,7 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
-    jwt.verify(token, config.JWT_SECRET, (err) => {
+    jwt.verify(token, config.JWT_SECRET, (err, decoded) => {
       if (err) {
         console.log(`WebSocket connection rejected: ${err.message}`);
         ws.close(4001, 'Unauthorized: Invalid token');
@@ -82,7 +82,8 @@ wss.on('connection', (ws, req) => {
       }
 
       console.log('WebSocket client successfully authenticated.');
-      spawnTerminal(ws, 'bash');
+      const sessionId = decoded && decoded.sessionId ? decoded.sessionId : 'default-session';
+      spawnTerminal(ws, sessionId, 'bash');
     });
   } catch (err) {
     console.error('Error during WebSocket verification:', err);
