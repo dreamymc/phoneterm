@@ -322,3 +322,136 @@ if (shellSelect) {
     }
   });
 }
+
+// --- Custom Context Menu & Copy/Paste Logic ---
+const contextMenu = document.getElementById('context-menu');
+const ctxCopy = document.getElementById('ctx-copy');
+const ctxPaste = document.getElementById('ctx-paste');
+const terminalContainer = document.getElementById('terminal-container');
+
+// Helper to check if clipboard permissions/APIs are available
+const hasClipboardSupport = typeof navigator.clipboard !== 'undefined';
+const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+function showContextMenu(x, y) {
+  if (!contextMenu) return;
+
+  // Enable/disable copy button based on selection
+  if (ctxCopy) {
+    const hasSelection = term.hasSelection();
+    ctxCopy.disabled = !hasSelection;
+  }
+
+  // Enable/disable paste button based on secure context check
+  if (ctxPaste) {
+    // navigator.clipboard.readText is only accessible in secure contexts (HTTPS or localhost)
+    ctxPaste.disabled = !isSecureContext || !hasClipboardSupport;
+  }
+
+  // Position the menu
+  contextMenu.style.left = `${x}px`;
+  contextMenu.style.top = `${y}px`;
+  contextMenu.classList.remove('hidden');
+}
+
+function hideContextMenu() {
+  if (contextMenu) {
+    contextMenu.classList.add('hidden');
+  }
+}
+
+// Right-click or long-press context menu intercept
+if (terminalContainer) {
+  terminalContainer.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    
+    // Calculate viewport bounds to prevent menu overflow
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // Fallback coordinates for touch events if clientX is undefined
+    if (x === undefined && e.touches && e.touches[0]) {
+      x = e.touches[0].clientX;
+      y = e.touches[0].clientY;
+    }
+    
+    const menuWidth = 160;
+    const menuHeight = 100;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    if (x + menuWidth > windowWidth) {
+      x = windowWidth - menuWidth - 10;
+    }
+    if (y + menuHeight > windowHeight) {
+      y = windowHeight - menuHeight - 10;
+    }
+    
+    showContextMenu(x, y);
+  });
+}
+
+// Dismiss context menu on click anywhere else
+document.addEventListener('click', (e) => {
+  if (contextMenu && !contextMenu.contains(e.target)) {
+    hideContextMenu();
+  }
+});
+
+// Copy action handler
+if (ctxCopy) {
+  ctxCopy.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (term.hasSelection()) {
+      const selectedText = term.getSelection();
+      if (hasClipboardSupport) {
+        navigator.clipboard.writeText(selectedText)
+          .then(() => {
+            const originalText = ctxCopy.textContent;
+            ctxCopy.textContent = "Copied!";
+            setTimeout(() => {
+              ctxCopy.textContent = originalText;
+              hideContextMenu();
+            }, 800);
+          })
+          .catch((err) => {
+            console.error("Clipboard write failed: ", err);
+            alert("Clipboard copy failed. Please copy manually.");
+            hideContextMenu();
+          });
+      } else {
+        alert("Clipboard access not supported in this browser.");
+        hideContextMenu();
+      }
+    }
+  });
+}
+
+// Paste action handler
+if (ctxPaste) {
+  ctxPaste.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!isSecureContext || !hasClipboardSupport) {
+      alert("Paste is disabled: navigator.clipboard requires a Secure Context (HTTPS or localhost). Please use the Cloudflare Tunnel URL to paste.");
+      hideContextMenu();
+      return;
+    }
+    
+    navigator.clipboard.readText()
+      .then((text) => {
+        if (text && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'input', data: text }));
+        }
+        hideContextMenu();
+      })
+      .catch((err) => {
+        console.error("Clipboard read failed: ", err);
+        alert("Could not read clipboard. Please check browser permissions.");
+        hideContextMenu();
+      });
+  });
+}

@@ -382,3 +382,51 @@ body.login-page {
   display: none !important;
 }
 
+/* Custom Glassmorphic Context Menu */
+#context-menu {
+  position: absolute;
+  z-index: 9999;
+  background: rgba(22, 22, 22, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 153, 0, 0.25);
+  border-radius: 10px;
+  padding: 6px 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ctx-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 10px 16px;
+  text-align: left;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  transition: background 0.2s ease, color 0.2s ease;
+  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ctx-item:hover:not(:disabled) {
+  background: rgba(255, 153, 0, 0.15);
+  color: var(--accent-color);
+}
+
+.ctx-item:active:not(:disabled) {
+  background: rgba(255, 153, 0, 0.25);
+}
+
+.ctx-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: #888;
+}
+
