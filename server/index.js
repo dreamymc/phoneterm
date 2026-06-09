@@ -149,8 +149,13 @@ server.listen(config.PORT, '0.0.0.0', async () => {
   // Query and cache Windows user profile path asynchronously
   try {
     config.WINDOWS_USERPROFILE = await detectWindowsUserProfile();
+    if (config.WINDOWS_USERPROFILE) {
+      console.log(chalk.green(`✓ Successfully cached Windows user profile: ${config.WINDOWS_USERPROFILE}`));
+    } else {
+      console.log(chalk.yellow(`⚠ Could not resolve Windows user profile. Falling back to default mount paths.`));
+    }
   } catch (err) {
-    // Ignore
+    console.error(chalk.red(`✗ Error detecting Windows user profile: ${err.message}`));
   }
 
   // Attempt to start Cloudflare Tunnel
