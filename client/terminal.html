@@ -4,11 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>PhoneTerm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
   <!-- xterm.css CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <!-- Top Toolbar for Shell Selector -->
+  <div id="top-bar">
+    <div class="brand">PhoneTerm</div>
+    <div class="shell-selector-container">
+      <select id="shell-select">
+        <option value="bash">WSL (bash)</option>
+        <option value="zsh">WSL (zsh)</option>
+        <option value="cmd">Windows CMD</option>
+        <option value="powershell">PowerShell</option>
+      </select>
+    </div>
+  </div>
   <div id="terminal-container"></div>
   
   <!-- Mobile Toolbar for Special Keys -->
