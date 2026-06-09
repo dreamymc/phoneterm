@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+
 cd "$(dirname "$0")/.."
 
 LOG_FILE="phoneterm.log"
@@ -11,5 +12,4 @@ if [ -f "$LOG_FILE" ]; then
   fi
 fi
 
-exec node server/index.js
-
+exec node server/index.js >> "$LOG_FILE" 2>&1
