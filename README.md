@@ -62,13 +62,13 @@ To boot the PhoneTerm server manually, run:
 bash scripts/start.sh
 ```
 
-Once running, the console will print connection details, listing both local network URLs and the secure Cloudflare Tunnel URL (if configured), alongside a QR code which you can scan with your smartphone to open the terminal immediately.
+Once running, the console will print connection details, listing both local network URLs and the secure Cloudflare Tunnel URL (if configured), alongside a QR code that you can scan with your smartphone to open the terminal immediately.
 
 ---
 
 ### Automatic Startup on Boot (Windows Task Scheduler)
 
-To ensure PhoneTerm is always available whenever your computer turns on, configure it to run in the background as a Windows startup service using **Windows Task Scheduler**.
+To ensure PhoneTerm is always available whenever your computer turns on, configure it to run in the background as a background startup task using **Windows Task Scheduler**.
 
 #### Step-by-Step Configuration:
 
@@ -89,7 +89,7 @@ To ensure PhoneTerm is always available whenever your computer turns on, configu
    - Click **Next**.
    - Configure the program settings:
      - **Program/script:** `C:\Windows\System32\wsl.exe`
-     - **Add arguments (optional):** `-d Ubuntu -e bash -c "cd ~/phoneterm && ./scripts/autostart.sh"`
+     - **Add arguments (optional):** `-d Ubuntu -e bash -c "cd ~/phoneterm && bash scripts/autostart.sh"`
        *(Note: If your WSL distribution is not Ubuntu, replace `-d Ubuntu` with your specific distribution name. If you cloned the repository to a folder other than `~/phoneterm`, update the directory path in the command accordingly).*
      - Click **Next**, then click **Finish**.
 
@@ -97,7 +97,7 @@ To ensure PhoneTerm is always available whenever your computer turns on, configu
    - In the **Task Scheduler Library**, locate and double-click the newly created `Start PhoneTerm` task to open its properties dialog.
    - **General Tab:**
      - Select **Run whether user is logged on or not**.
-     - Check the checkbox **Run with highest privileges**.
+     - Check the **Run with highest privileges** checkbox.
    - **Conditions Tab:**
      - Uncheck **Start the task only if the computer is on AC power** (to guarantee the task runs on laptops when running on battery).
    - Click **OK**, then enter your Windows user credentials if prompted to authorize the task execution policy.
