@@ -29,7 +29,7 @@ const wss = new WebSocket.Server({ noServer: true });
 app.use(express.json());
 
 app.use((req, res, next) => {
-  const host = req.headers.host || '';
+  const host = req.get('host') || '';
   if (host.endsWith('.trycloudflare.com')) {
     res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests');
   }
@@ -54,7 +54,9 @@ app.get('/term', (req, res) => {
 
 // Handle connection upgrade to /terminal WebSocket
 server.on('upgrade', (request, socket, head) => {
-  const { pathname } = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+  const rawHost = request.headers['x-forwarded-host'] || request.headers.host || 'localhost';
+  const expectedHost = rawHost.split(',')[0].trim();
+  const { pathname } = new URL(request.url, `http://${expectedHost}`);
 
   if (pathname === '/terminal') {
     // Validate WebSocket upgrade Origin header
@@ -62,8 +64,8 @@ server.on('upgrade', (request, socket, head) => {
     if (origin) {
       try {
         const parsedOrigin = new URL(origin);
-        if (parsedOrigin.host !== request.headers.host) {
-          console.warn(`WebSocket upgrade rejected: Origin mismatch (${parsedOrigin.host} !== ${request.headers.host})`);
+        if (parsedOrigin.host !== expectedHost) {
+          console.warn(`WebSocket upgrade rejected: Origin mismatch (${parsedOrigin.host} !== ${expectedHost})`);
           socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
           socket.destroy();
           return;
