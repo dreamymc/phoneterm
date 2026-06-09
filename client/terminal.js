@@ -95,6 +95,8 @@ function connectWebSocket() {
   ws.onopen = () => {
     console.log("WebSocket connected.");
     reconnectAttempts = 0;
+    lastCols = null;
+    lastRows = null;
     if (reconnectOverlay) {
       reconnectOverlay.classList.add('hidden');
     }
@@ -133,15 +135,23 @@ function connectWebSocket() {
       }, 2000);
     } else if (event.reason === 'logout') {
       term.write('\r\n[Logged out]\r\n');
+      localStorage.removeItem('phoneterm_token');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
     } else {
-      term.write('\r\n[Connection lost]\r\n');
+      if (reconnectAttempts === 0) {
+        term.write('\r\n[Connection lost]\r\n');
+      }
       handleReconnect();
     }
   };
 
   ws.onerror = (err) => {
     console.error("WebSocket error:", err);
-    term.write('\r\n[WebSocket connection error]\r\n');
+    if (reconnectAttempts === 0) {
+      term.write('\r\n[WebSocket connection error]\r\n');
+    }
   };
 }
 
