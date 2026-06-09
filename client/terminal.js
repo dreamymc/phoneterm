@@ -11,6 +11,8 @@ if (!token) {
 
 // Declare ws at the module level
 let ws;
+let lastCols = null;
+let lastRows = null;
 
 // Initialize xterm.js terminal
 const term = new Terminal({
@@ -49,11 +51,15 @@ function resizeTerminal() {
     fitAddon.fit();
 
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'resize',
-        cols: term.cols,
-        rows: term.rows
-      }));
+      if (term.cols !== lastCols || term.rows !== lastRows) {
+        ws.send(JSON.stringify({
+          type: 'resize',
+          cols: term.cols,
+          rows: term.rows
+        }));
+        lastCols = term.cols;
+        lastRows = term.rows;
+      }
     }
   } catch (err) {
     console.error("Error running resizeTerminal:", err);
