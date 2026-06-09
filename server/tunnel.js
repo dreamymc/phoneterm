@@ -38,19 +38,17 @@ function startTunnel(port, timeoutMs = 30000) {
       };
       const sigintHandler = () => {
         try { cf.kill(); } catch (e) {}
-        process.exit(0);
+        process.removeListener('SIGINT', sigintHandler);
+        process.kill(process.pid, 'SIGINT');
       };
       const sigtermHandler = () => {
         try { cf.kill(); } catch (e) {}
-        process.exit(0);
+        process.removeListener('SIGTERM', sigtermHandler);
+        process.kill(process.pid, 'SIGTERM');
       };
 
-      // Clean up helper
-      function cleanUp() {
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
-        }
+      // Clean up helper for process-level listeners
+      function cleanUpProcessListeners() {
         process.off('exit', exitHandler);
         process.off('SIGINT', sigintHandler);
         process.off('SIGTERM', sigtermHandler);
@@ -59,11 +57,21 @@ function startTunnel(port, timeoutMs = 30000) {
       function settle(err, url) {
         if (settled) return;
         settled = true;
-        cleanUp();
+
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+
         if (err) {
+          // Failure: clean up process-level listeners immediately and kill process
+          cleanUpProcessListeners();
           try { cf.kill(); } catch (e) {}
           return reject(err);
         }
+
+        // Success: do not clean up process-level listeners now;
+        // they must remain active to kill cf when parent Node process exits/SIGINT/SIGTERM.
         resolve(url);
       }
 
@@ -74,6 +82,7 @@ function startTunnel(port, timeoutMs = 30000) {
 
       // cloudflared prints the URL to stderr
       cf.stderr.on('data', (chunk) => {
+        if (settled) return;
         const text = chunk.toString();
         const match = text.match(TUNNEL_URL_RE);
         if (match) {
@@ -83,6 +92,7 @@ function startTunnel(port, timeoutMs = 30000) {
 
       // Also check stdout just in case (future cloudflared versions)
       cf.stdout.on('data', (chunk) => {
+        if (settled) return;
         const text = chunk.toString();
         const match = text.match(TUNNEL_URL_RE);
         if (match) {
@@ -91,10 +101,19 @@ function startTunnel(port, timeoutMs = 30000) {
       });
 
       cf.on('error', (err) => {
+        if (settled) {
+          console.error(`[Tunnel] cloudflared encountered an error: ${err.message}`);
+          return;
+        }
         settle(new Error(`Failed to spawn cloudflared: ${err.message}`));
       });
 
       cf.on('exit', (code, signal) => {
+        if (settled) {
+          console.error(`[Tunnel] cloudflared process exited unexpectedly (code=${code}, signal=${signal})`);
+          cleanUpProcessListeners();
+          return;
+        }
         settle(new Error(`cloudflared exited unexpectedly (code=${code}, signal=${signal})`));
       });
 
