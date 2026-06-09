@@ -68,7 +68,12 @@ function spawnTerminal(ws, initialShell = 'bash') {
     if (shellName === 'cmd' || shellName === 'powershell') {
       if (WSL_MOUNT) {
         if (config.WINDOWS_USERNAME && config.WINDOWS_USERNAME.trim() !== '') {
-          cwd = `${WSL_MOUNT}/Users/${config.WINDOWS_USERNAME}`;
+          const profilePath = `${WSL_MOUNT}/Users/${config.WINDOWS_USERNAME}`;
+          if (fs.existsSync(profilePath)) {
+            cwd = profilePath;
+          } else {
+            cwd = WSL_MOUNT;
+          }
         } else {
           cwd = WSL_MOUNT;
         }
@@ -154,8 +159,8 @@ function spawnTerminal(ws, initialShell = 'bash') {
           term.write(msg.data);
         }
       } else if (msg.type === 'resize') {
-        cols = msg.cols;
-        rows = msg.rows;
+        cols = Math.max(1, parseInt(msg.cols, 10) || 80);
+        rows = Math.max(1, parseInt(msg.rows, 10) || 24);
         if (term) {
           term.resize(cols, rows);
         }
