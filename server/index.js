@@ -4,6 +4,8 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const fs = require('fs');
+const { exec } = require('child_process');
 const ip = require('ip');
 const chalkModule = require('chalk');
 const chalk = chalkModule.default || chalkModule;
@@ -88,10 +90,51 @@ wss.on('connection', (ws, req) => {
   }
 });
 
+/**
+ * Detects the Windows host username via WSL interop cmd.exe.
+ */
+function detectWindowsUsername() {
+  return new Promise((resolve) => {
+    const paths = [
+      { cmd: '/mnt/c/Windows/System32/cmd.exe', cwd: '/mnt/c' },
+      { cmd: '/mnt/c/Windows/system32/cmd.exe', cwd: '/mnt/c' },
+      { cmd: '/c/Windows/System32/cmd.exe', cwd: '/c' },
+      { cmd: '/c/Windows/system32/cmd.exe', cwd: '/c' }
+    ];
+
+    let target = null;
+    for (const p of paths) {
+      if (fs.existsSync(p.cmd)) {
+        target = p;
+        break;
+      }
+    }
+
+    if (!target) {
+      return resolve(null);
+    }
+
+    exec(`"${target.cmd}" /c echo %USERNAME% < /dev/null`, { timeout: 2000, cwd: target.cwd }, (error, stdout) => {
+      if (error) {
+        return resolve(null);
+      }
+      const username = stdout.trim();
+      resolve(username || null);
+    });
+  });
+}
+
 // ─── Async Startup ────────────────────────────────────────────────────────────
 server.listen(config.PORT, '0.0.0.0', async () => {
   const localIp = ip.address();
   const localUrl = `http://${localIp}:${config.PORT}`;
+
+  // Query and cache Windows username asynchronously
+  try {
+    config.WINDOWS_USERNAME = await detectWindowsUsername();
+  } catch (err) {
+    // Ignore
+  }
 
   // Attempt to start Cloudflare Tunnel
   let publicUrl = null;

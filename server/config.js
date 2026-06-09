@@ -21,5 +21,6 @@ module.exports = {
   PORT,
   AUTH_SECRET,
   JWT_SECRET,
-  JWT_EXPIRY
+  JWT_EXPIRY,
+  WINDOWS_USERNAME: null
 };
