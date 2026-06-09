@@ -16,24 +16,25 @@ if command -v apt-get &> /dev/null; then
   fi
 fi
 
-# Download/Install cloudflared if not present
-if ! command -v cloudflared &> /dev/null; then
-  echo "Installing cloudflared..."
+# Download/Install cloudflared locally if not present
+if [ ! -f bin/cloudflared ]; then
+  echo "Installing cloudflared to ./bin/ (no sudo required)..."
+  mkdir -p bin
   ARCH=$(uname -m)
   case "$ARCH" in
-    x86_64)
-      CLOUDFLARED_ARCH="amd64"
-      ;;
-    aarch64|arm64)
-      CLOUDFLARED_ARCH="arm64"
-      ;;
+    x86_64)   CLOUDFLARED_ARCH="amd64" ;;
+    aarch64|arm64) CLOUDFLARED_ARCH="arm64" ;;
     *)
       echo "Error: Unsupported architecture $ARCH for cloudflared" >&2
       exit 1
       ;;
   esac
-  sudo curl -L "https://github.com/cloudflare/cloudflare-tunnel/releases/latest/download/cloudflared-linux-${CLOUDFLARED_ARCH}" -o /usr/local/bin/cloudflared
-  sudo chmod +x /usr/local/bin/cloudflared
+  curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CLOUDFLARED_ARCH}" \
+    -o bin/cloudflared
+  chmod +x bin/cloudflared
+  echo "cloudflared installed to ./bin/cloudflared"
+else
+  echo "cloudflared already present at ./bin/cloudflared. Skipping."
 fi
 
 # Verify node and npm are installed
