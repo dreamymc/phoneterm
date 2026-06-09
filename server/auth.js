@@ -6,6 +6,10 @@ const config = require('./config');
 
 const router = express.Router();
 
+// Declare memory-based rate limiter map and revoked tokens set
+const failedAttempts = new Map();
+const revokedTokens = new Set();
+
 // Pre-allocate the Secret Buffer once at module load
 const secretBuffer = Buffer.from(config.AUTH_SECRET || '', 'utf-8');
 
@@ -31,6 +35,21 @@ function verifyToken(inputToken) {
 
 // POST /auth/login
 router.post('/login', (req, res) => {
+  const ipAddress = req.ip;
+  const entry = failedAttempts.get(ipAddress);
+
+  if (entry) {
+    const elapsed = Date.now() - entry.firstAttemptTime;
+    if (elapsed < 15 * 60 * 1000) {
+      if (entry.count >= 5) {
+        const remainingMinutes = Math.ceil((15 * 60 * 1000 - elapsed) / 60000);
+        return res.status(429).json({ error: "Too many attempts. Try again in " + remainingMinutes + " minutes" });
+      }
+    } else {
+      failedAttempts.delete(ipAddress);
+    }
+  }
+
   const { token } = req.body;
   
   if (!token) {
@@ -38,17 +57,30 @@ router.post('/login', (req, res) => {
   }
 
   if (verifyToken(token)) {
+    failedAttempts.delete(ipAddress);
+    
+    const jti = uuidv4();
+    const sessionId = uuidv4();
     const jwtToken = jwt.sign(
-      { authenticated: true, sessionId: uuidv4() },
+      { authenticated: true, sessionId, jti },
       config.JWT_SECRET,
-      { expiresIn: config.JWT_EXPIRY }
+      { algorithm: 'HS256', expiresIn: config.JWT_EXPIRY }
     );
     return res.json({ token: jwtToken });
+  }
+
+  // Update failedAttempts for the IP
+  const currentEntry = failedAttempts.get(ipAddress);
+  if (!currentEntry) {
+    failedAttempts.set(ipAddress, { count: 1, firstAttemptTime: Date.now() });
+  } else {
+    currentEntry.count += 1;
   }
 
   return res.status(401).json({ error: 'Invalid access token' });
 });
 
 module.exports = {
-  authRouter: router
+  authRouter: router,
+  revokedTokens
 };
