@@ -3,3 +3,6 @@ node_modules/
 *.log
 /bin/
 /logs/
+.agents/
+*plan.md
+docs/plans/
