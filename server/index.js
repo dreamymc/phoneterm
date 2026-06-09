@@ -1,3 +1,5 @@
+'use strict';
+
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -5,8 +7,11 @@ const path = require('path');
 const ip = require('ip');
 const chalkModule = require('chalk');
 const chalk = chalkModule.default || chalkModule;
+const qrcode = require('qrcode-terminal');
+
 const config = require('./config');
 const { spawnTerminal } = require('./terminal');
+const { startTunnel } = require('./tunnel');
 
 const jwt = require('jsonwebtoken');
 const { authRouter } = require('./auth');
@@ -50,48 +55,74 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (ws, req) => {
-  console.log("New WebSocket client connecting...");
-  
-  // Extract and verify JWT token from query parameters
+  console.log('New WebSocket client connecting...');
+
   try {
     const { searchParams } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const token = searchParams.get('token');
-    
+
     if (!token) {
-      console.log("WebSocket connection rejected: Missing token");
+      console.log('WebSocket connection rejected: Missing token');
       ws.close(4001, 'Unauthorized: Missing token');
       return;
     }
-    
-    jwt.verify(token, config.JWT_SECRET, (err, decoded) => {
+
+    jwt.verify(token, config.JWT_SECRET, (err) => {
       if (err) {
         console.log(`WebSocket connection rejected: ${err.message}`);
         ws.close(4001, 'Unauthorized: Invalid token');
         return;
       }
-      
+
       if (ws.readyState !== WebSocket.OPEN) {
-        console.log("WebSocket closed before PTY could be spawned.");
+        console.log('WebSocket closed before PTY could be spawned.');
         return;
       }
-      
-      console.log("WebSocket client successfully authenticated.");
-      // Spawn terminal process
+
+      console.log('WebSocket client successfully authenticated.');
       spawnTerminal(ws, 'bash');
     });
   } catch (err) {
-    console.error("Error during WebSocket verification:", err);
+    console.error('Error during WebSocket verification:', err);
     ws.close(4001, 'Internal authentication error');
   }
 });
 
-// Start listening on 0.0.0.0:PORT
-server.listen(config.PORT, '0.0.0.0', () => {
+// ─── Async Startup ────────────────────────────────────────────────────────────
+server.listen(config.PORT, '0.0.0.0', async () => {
   const localIp = ip.address();
-  console.log(chalk.green('╔═══════════════════════════════════════╗'));
-  console.log(chalk.green('║         PhoneTerm is running          ║'));
-  console.log(chalk.green('╠═══════════════════════════════════════╣'));
-  console.log(chalk.green(`║  Local:       http://${localIp}:${config.PORT} ║`));
-  console.log(chalk.green(`║  Auth Token:  ${config.AUTH_SECRET}  ║`));
-  console.log(chalk.green('╚═══════════════════════════════════════╝'));
+  const localUrl = `http://${localIp}:${config.PORT}`;
+
+  // Attempt to start Cloudflare Tunnel
+  let publicUrl = null;
+  try {
+    console.log(chalk.yellow('Starting Cloudflare Tunnel… (this takes ~10 seconds)'));
+    publicUrl = await startTunnel(config.PORT);
+  } catch (err) {
+    console.warn(chalk.yellow(`Warning: Cloudflare Tunnel failed to start: ${err.message}`));
+    console.warn(chalk.yellow('Continuing without public URL.'));
+  }
+
+  // ── Banner ─────────────────────────────────────────────────────────────────
+  console.log('');
+  console.log(chalk.green('╔' + '═'.repeat(63) + '╗'));
+  console.log(chalk.green('║' + '                   PhoneTerm is running                       ' + '║'));
+  console.log(chalk.green('╠' + '═'.repeat(63) + '╣'));
+  console.log(chalk.green(`║  Local:   ${localUrl.padEnd(51)} ║`));
+  if (publicUrl) {
+    console.log(chalk.green(`║  Public:  ${publicUrl.padEnd(51)} ║`));
+  }
+  console.log(chalk.green(`║  Token:   ${config.AUTH_SECRET.padEnd(51)} ║`));
+  console.log(chalk.green('╚' + '═'.repeat(63) + '╝'));
+  console.log('');
+
+  // ── Local QR Code ──────────────────────────────────────────────────────────
+  console.log(chalk.cyan('  ▸ Local Network QR Code:'));
+  qrcode.generate(localUrl, { small: true });
+
+  // ── Public QR Code ─────────────────────────────────────────────────────────
+  if (publicUrl) {
+    console.log(chalk.cyan('  ▸ Public (Cloudflare) QR Code:'));
+    qrcode.generate(publicUrl, { small: true });
+  }
 });
