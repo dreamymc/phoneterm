@@ -95,6 +95,9 @@ function spawnTerminal(ws, initialShell = 'bash') {
         ...process.env,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
+        FORCE_COLOR: '3',
+        TERM_PROGRAM: 'phoneterm',
+        LANG: process.env.LANG || 'en_US.UTF-8',
       }
     });
   }
@@ -131,6 +134,7 @@ function spawnTerminal(ws, initialShell = 'bash') {
         ws.send(JSON.stringify({ type: 'shell-active', shell: shellName }));
       }
 
+      // Forward immediately to the WebSocket with absolutely no buffering, debouncing, or batching
       activeDataListener = term.onData((data) => {
         if (ws.readyState === ws.OPEN) {
           ws.send(JSON.stringify({ type: 'output', data }));
