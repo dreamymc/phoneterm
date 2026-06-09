@@ -378,3 +378,7 @@ body.login-page {
   100% { transform: rotate(360deg); }
 }
 
+.hidden {
+  display: none !important;
+}
+
