@@ -115,7 +115,8 @@ ws.onclose = (event) => {
 };
 
 ws.onerror = (err) => {
-  term.write(`\r\n[WebSocket error: ${err.message || 'unknown'}]\r\n`);
+  console.error("WebSocket error:", err);
+  term.write('\r\n[WebSocket connection error]\r\n');
 };
 
 // Handle user typing
@@ -142,17 +143,21 @@ term.onData((data) => {
 const ctrlBtn = document.getElementById('ctrl-btn');
 function toggleCtrl(state) {
   ctrlActive = state !== undefined ? state : !ctrlActive;
-  if (ctrlActive) {
-    ctrlBtn.classList.add('active');
-  } else {
-    ctrlBtn.classList.remove('active');
+  if (ctrlBtn) {
+    if (ctrlActive) {
+      ctrlBtn.classList.add('active');
+    } else {
+      ctrlBtn.classList.remove('active');
+    }
   }
 }
 
-ctrlBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  toggleCtrl();
-});
+if (ctrlBtn) {
+  ctrlBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleCtrl();
+  });
+}
 
 // Special sequences mapping for touch buttons
 const seqMap = {
