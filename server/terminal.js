@@ -89,7 +89,16 @@ function cleanupSession(sessionId) {
     session.term = null;
   }
 
-  session.ws = null;
+  if (session.ws) {
+    if (session.ws.readyState === 1 || session.ws.readyState === 0) {
+      try {
+        session.ws.close(1000, 'Session cleaned up');
+      } catch (e) {
+        console.error(`Error closing WebSocket during session cleanup:`, e);
+      }
+    }
+    session.ws = null;
+  }
   activeSessions.delete(sessionId);
 }
 
@@ -170,6 +179,8 @@ function spawnSession(sessionId, session, shellName) {
     if (shellName !== 'bash') {
       spawnSession(sessionId, session, 'bash');
       return;
+    } else {
+      cleanupSession(sessionId);
     }
   }
 }
@@ -269,17 +280,18 @@ function spawnTerminal(ws, sessionId, initialShell = 'bash') {
       session.disconnectTimeout = null;
     }
 
+    // Bind the new WebSocket first to avoid race condition with the old WebSocket's close handler
+    const oldWs = session.ws;
+    session.ws = ws;
+
     // Close the previous WebSocket if it exists and is different from the new one
-    if (session.ws && session.ws !== ws) {
+    if (oldWs && oldWs !== ws) {
       try {
-        session.ws.close();
+        oldWs.close(1000, 'Replaced by new connection');
       } catch (e) {
         console.error(`Error closing old WebSocket for session ${sessionId}:`, e);
       }
     }
-
-    // Bind the new WebSocket
-    session.ws = ws;
 
     // Send the rolling scrollback history buffer
     if (session.buffer && ws.readyState === ws.OPEN) {
