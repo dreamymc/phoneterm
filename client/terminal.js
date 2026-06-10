@@ -60,7 +60,18 @@ function resizeTerminal() {
       container.style.height = `${targetHeight}px`;
     }
 
+    // Determine scroll state prior to fitting
+    const isAtBottom = term.buffer.active.viewportY === term.buffer.active.baseY;
+    const previousScrollY = term.buffer.active.viewportY;
+
     fitAddon.fit();
+
+    // Restore scroll position
+    if (isAtBottom) {
+      term.scrollToBottom();
+    } else {
+      term.scrollToLine(previousScrollY);
+    }
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       if (term.cols !== lastCols || term.rows !== lastRows) {
@@ -245,10 +256,12 @@ function toggleCtrl(state) {
 }
 
 if (ctrlBtn) {
-  ctrlBtn.addEventListener('click', (e) => {
+  const handleCtrl = (e) => {
     e.preventDefault();
     toggleCtrl();
-  });
+  };
+  ctrlBtn.addEventListener('click', handleCtrl);
+  ctrlBtn.addEventListener('touchstart', handleCtrl);
 }
 
 // Special sequences mapping for touch buttons
@@ -260,25 +273,38 @@ const seqMap = {
   'left': '\x1b[D',
   'right': '\x1b[C',
   'ctrl-c': '\x03',
-  'ctrl-d': '\x04'
+  'ctrl-d': '\x04',
+  'enter': '\r'
 };
 
 document.querySelectorAll('.key-btn[data-seq]').forEach(btn => {
-  btn.addEventListener('click', (e) => {
+  const handleKey = (e) => {
     e.preventDefault();
     const seqName = btn.getAttribute('data-seq');
     const seq = seqMap[seqName];
     if (seq && ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'input', data: seq }));
     }
-  });
+  };
+  btn.addEventListener('click', handleKey);
+  btn.addEventListener('touchstart', handleKey);
 });
+
+// Debounce helper to prevent rapid resize reflows
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+const debouncedResize = debounce(resizeTerminal, 150);
 
 // Watch visualViewport for mobile keyboard height shifts
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', resizeTerminal);
+  window.visualViewport.addEventListener('resize', debouncedResize);
 } else {
-  window.addEventListener('resize', resizeTerminal);
+  window.addEventListener('resize', debouncedResize);
 }
 // Initial fit
 setTimeout(resizeTerminal, 100);
@@ -286,7 +312,7 @@ setTimeout(resizeTerminal, 100);
 // Handle Logout Action
 const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
-  logoutBtn.addEventListener('click', (e) => {
+  const handleLogout = (e) => {
     e.preventDefault();
     if (confirm("Disconnect and log out of Conduit?")) {
       localStorage.removeItem('conduit_token');
@@ -295,7 +321,9 @@ if (logoutBtn) {
       }
       window.location.href = '/';
     }
-  });
+  };
+  logoutBtn.addEventListener('click', handleLogout);
+  logoutBtn.addEventListener('touchstart', handleLogout);
 }
 
 // Handle Shell Switcher Selection

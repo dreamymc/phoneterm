@@ -430,3 +430,11 @@ body.login-page {
   color: #888;
 }
 
+@media (max-width: 500px) {
+  .key-btn {
+    font-size: 11px;
+    padding: 0 2px;
+  }
+}
+
+
