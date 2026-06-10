@@ -209,7 +209,7 @@ server.listen(config.PORT, '0.0.0.0', async () => {
   // ── Banner ─────────────────────────────────────────────────────────────────
   console.log('');
   console.log(chalk.green('╔' + '═'.repeat(63) + '╗'));
-  console.log(chalk.green('║' + '                   PhoneTerm is running                       ' + '║'));
+  console.log(chalk.green('║' + '                     Conduit is running                       ' + '║'));
   console.log(chalk.green('╠' + '═'.repeat(63) + '╣'));
   console.log(chalk.green(`║  Local:   ${localUrl.padEnd(51)} ║`));
   if (publicUrl) {

@@ -3,7 +3,7 @@ let activeShell = 'bash';
 const shellSelect = document.getElementById('shell-select');
 
 // Retrieve token from local storage
-const token = localStorage.getItem('phoneterm_token');
+const token = localStorage.getItem('conduit_token');
 if (!token) {
   window.location.href = '/';
   throw new Error('Redirecting: no auth token.');
@@ -129,13 +129,13 @@ function connectWebSocket() {
   ws.onclose = (event) => {
     if (event.code === 4001) {
       term.write('\r\n[Authentication failed or expired. Redirecting to login...]\r\n');
-      localStorage.removeItem('phoneterm_token');
+      localStorage.removeItem('conduit_token');
       setTimeout(() => {
         window.location.href = '/';
       }, 2000);
     } else if (event.reason === 'logout') {
       term.write('\r\n[Logged out]\r\n');
-      localStorage.removeItem('phoneterm_token');
+      localStorage.removeItem('conduit_token');
       setTimeout(() => {
         window.location.href = '/';
       }, 1500);
@@ -288,8 +288,8 @@ const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
   logoutBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    if (confirm("Disconnect and log out of PhoneTerm?")) {
-      localStorage.removeItem('phoneterm_token');
+    if (confirm("Disconnect and log out of Conduit?")) {
+      localStorage.removeItem('conduit_token');
       if (ws) {
         ws.close(1000, 'logout');
       }

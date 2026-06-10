@@ -137,7 +137,7 @@ function spawnSession(sessionId, session, shellName) {
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
         FORCE_COLOR: '3',
-        TERM_PROGRAM: 'phoneterm',
+        TERM_PROGRAM: 'conduit',
         LANG: process.env.LANG || 'en_US.UTF-8',
       }
     });

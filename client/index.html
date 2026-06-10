@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PhoneTerm - Login</title>
+  <title>Conduit - Login</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
     <div class="login-card" id="login-card">
       <div class="logo-area">
         <span class="terminal-prompt">$</span>
-        <span class="logo-text">PhoneTerm</span>
+        <span class="logo-text">Conduit</span>
       </div>
       <p class="subtitle">Secure WSL Remote Terminal Access</p>
       
@@ -36,7 +36,7 @@
 
   <script>
     // Auto-redirect if already logged in
-    const existingToken = localStorage.getItem('phoneterm_token');
+    const existingToken = localStorage.getItem('conduit_token');
     if (existingToken) {
       window.location.href = '/term';
     }
@@ -66,7 +66,7 @@
         const data = await response.json();
 
         if (response.ok && data.token) {
-          localStorage.setItem('phoneterm_token', data.token);
+          localStorage.setItem('conduit_token', data.token);
           window.location.href = '/term';
         } else {
           showError(data.error || 'Access denied');

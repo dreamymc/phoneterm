@@ -4,7 +4,7 @@ set -euo pipefail
 # Make sure we are in the project root
 cd "$(dirname "$0")/.."
 
-echo "Setting up PhoneTerm..."
+echo "Setting up Conduit..."
 
 # Install build dependencies inside WSL Ubuntu/Debian if compilation tools are missing
 if command -v apt-get &> /dev/null; then
@@ -74,4 +74,4 @@ fi
 npm install
 npm rebuild node-pty
 
-echo "Setup complete. Run ./scripts/start.sh to start PhoneTerm."
+echo "Setup complete. Run ./scripts/start.sh to start Conduit."

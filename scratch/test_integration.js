@@ -19,7 +19,7 @@ function startServer() {
     serverProcess.stdout.on('data', (data) => {
       const output = data.toString();
       console.log(`[Server stdout] ${output.trim()}`);
-      if (output.includes('PhoneTerm is running')) {
+      if (output.includes('Conduit is running')) {
         resolve();
       }
     });

@@ -1,6 +1,6 @@
 {
-  "name": "PhoneTerm",
-  "short_name": "PhoneTerm",
+  "name": "Conduit",
+  "short_name": "Conduit",
   "description": "Secure mobile pseudo-terminal interface for WSL 2",
   "start_url": "/term",
   "display": "standalone",

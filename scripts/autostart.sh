@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-LOG_FILE="phoneterm.log"
+LOG_FILE="conduit.log"
 
 if [ -f "$LOG_FILE" ]; then
   FILE_SIZE=$(stat -c%s "$LOG_FILE" 2>/dev/null || stat -f%z "$LOG_FILE" 2>/dev/null || echo 0)
