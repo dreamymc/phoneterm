@@ -1,6 +1,6 @@
 # Conduit
 
-> **Secure, mobile-first terminal access for your WSL 2 environment.**
+> **Secure, mobile-first remote terminal access for your WSL 2 environment.**
 > Turn any phone browser into a full shell connected directly to your Linux environment on Windows — on your local network or over the internet.
 
 ```
